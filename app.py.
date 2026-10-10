@@ -1,0 +1,48 @@
+import os
+from flask import Flask, request, jsonify
+from google import genai
+
+app = Flask(__name__)
+
+api_key = os.environ.get("GEMINI_API_KEY")
+client = genai.Client(api_key=api_key) if api_key else None
+
+
+@app.route("/")
+def home():
+    return "PANZZ AI Backend aktif"
+
+
+@app.route("/api/assistant", methods=["POST"])
+def assistant():
+    data = request.get_json(silent=True) or {}
+    message = data.get("message", "").strip()
+
+    if not message:
+        return jsonify({"error": "Pesan masih kosong"}), 400
+
+    if client is None:
+        return jsonify({
+            "error": "GEMINI_API_KEY belum diatur"
+        }), 500
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=message
+        )
+        return jsonify({
+            "reply": response.text or "Tidak ada jawaban."
+        })
+    except Exception:
+        app.logger.exception("Permintaan Gemini gagal")
+        return jsonify({
+            "error": "Gagal menghubungi AI. Periksa API key dan konfigurasi server."
+        }), 500
+
+
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000))
+    )
